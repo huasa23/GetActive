@@ -1,0 +1,41 @@
+name: GetActive CI/CD with Docker Compose
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and start all services
+        run: docker-compose -f docker-compose.ci.yml up -d --build
+
+      - name: wait for backend service to start
+        run: |
+          for i in {1..30}; do
+            if curl -s http://localhost:8080/actuator/health | grep UP; then
+              echo "backend service started"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "backend service start timeout"
+          exit 1
+
+      - name: backend test
+        run: docker-compose exec backend mvn test
+
+      - name: frontend test
+        run: docker-compose exec frontend npm test
+
+      - name: stop services
+        run: docker-compose down
