@@ -1,8 +1,8 @@
-FROM maven:3.9.6-openjdk-8 AS build
+FROM maven:3.8-openjdk-8 AS build
 WORKDIR /app
-COPY pom.xml .
+COPY getactive/pom.xml .
 RUN mvn dependency:go-offline
-COPY src ./src
+COPY getactive/src ./src
 RUN mvn clean package -DskipTests
 
 FROM openjdk:8-jre-slim
