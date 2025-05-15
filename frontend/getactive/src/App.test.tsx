@@ -26,8 +26,24 @@ describe('App', () => {
 
 describe('API 测试', () => {
     it('应该从后端获取数据', async () => {
-      const response = await axios.get('http://localhost:8080/api/health');
+      const response = await axios.get('http://localhost:8080/api/health')
       expect(response.status).toBe(200);
       expect(response.data.length).toBeGreaterThan(0);
+    });
+});
+
+describe('API 测试', () => {
+    it('应该从后端获取数据', async () => {
+      const response = await axios.get('http://localhost:8080/api/health').then(response => {
+        console.log('API 响应成功:', response.data);
+      })
+      .catch(error => {
+        console.error('API 错误详情:', {
+          message: error.message,
+          code: error.code,
+          response: error.response,
+          config: error.config
+        });
+      });
     });
 });
