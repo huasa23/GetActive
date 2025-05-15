@@ -100,7 +100,7 @@ jobs:
         working-directory: ./frontend/getactive
         run: |
           npm ci
-          npm test
+          npm run test
         env:
           # 如果前端测试需要知道后端 URL
           REACT_APP_API_URL: http://localhost:8080/api
