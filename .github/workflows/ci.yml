@@ -32,7 +32,7 @@ jobs:
       # 初始化数据库
       - name: Initialize database
         run: |
-          mysql -h127.0.0.1 -P3306 -uroot -ppassword getactive < ./backend/01-init.sql
+          mysql -h127.0.0.1 -P3306 -uroot -ppassword getactive < ./backend/getactive/01-init.sql
       
       # 设置 JDK 环境
       - name: Setup JDK
