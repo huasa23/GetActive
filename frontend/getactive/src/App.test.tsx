@@ -1,6 +1,7 @@
 // src/App.test.jsx
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import axios from 'axios';
 import App from './App';
 
 describe('App', () => {
@@ -21,4 +22,12 @@ describe('App', () => {
     // 检查计数值是否增加
     expect(screen.getByText('count is 1')).toBeInTheDocument();
   });
+});
+
+describe('API 测试', () => {
+    it('应该从后端获取数据', async () => {
+      const response = await axios.get('http://localhost:8080/api/health');
+      expect(response.status).toBe(200);
+      expect(response.data.length).toBeGreaterThan(0);
+    });
 });
