@@ -1,41 +1,108 @@
-name: GetActive CI/CD with Docker Compose
+name: CI Tests
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
-    branches: [main]
+    branches: ['**']
 
 jobs:
-  build-and-test:
+  integrated-test:
+    name: Integrated Tests
     runs-on: ubuntu-latest
-
+    
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: getactive
+          MYSQL_USER: root
+          MYSQL_PASSWORD: password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and start all services
-        run: docker-compose -f docker-compose.ci.yml up -d --build
-
-      - name: wait for backend service to start
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      # 初始化数据库
+      - name: Initialize database
         run: |
+          mysql -h127.0.0.1 -P3306 -uroot -ppassword getactive < ./backend/01-init.sql
+      
+      # 设置 JDK 环境
+      - name: Setup JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'zulu'
+      
+      # 设置 Gradle
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+      
+      # 后端测试
+      - name: Run backend tests
+        working-directory: ./backend/getactive
+        run: |
+          ./gradlew test
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/getactive
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: password
+      
+      # 启动后端服务
+      - name: Build and start backend service
+        working-directory: ./backend/getactive
+        run: |
+          # 构建后端
+          ./gradlew build -x test
+          
+          # 启动后端服务（在后台运行）
+          nohup java -jar build/libs/*.jar \
+            --spring.datasource.url=jdbc:mysql://localhost:3306/getactive \
+            --spring.datasource.username=root \
+            --spring.datasource.password=password \
+            > backend.log 2>&1 &
+          
+          # 等待后端服务启动
+          echo "Waiting for backend service to start..."
           for i in {1..30}; do
-            if curl -s http://localhost:8080/actuator/health | grep UP; then
-              echo "backend service started"
-              exit 0
+            if curl -s http://localhost:8080/api/health | grep -q "UP"; then
+              echo "Backend service is up!"
+              break
             fi
-            sleep 5
+            
+            if [ $i -eq 30 ]; then
+              echo "Backend service failed to start within timeout"
+              cat backend.log
+              exit 1
+            fi
+            
+            echo "Waiting... ($i/30)"
+            sleep 2
           done
-          echo "backend service start timeout"
-          exit 1
-
-      - name: backend test
-        run: docker-compose exec backend mvn test
-
-      - name: frontend test
-        run: docker-compose exec frontend npm test
-
-      - name: stop services
-        run: docker-compose down
+      
+      # 设置 Node.js 环境
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/getactive/package-lock.json'
+      
+      # 前端测试
+      - name: Run frontend tests
+        working-directory: ./frontend/getactive
+        run: |
+          npm ci
+          npm test
+        env:
+          # 如果前端测试需要知道后端 URL
+          REACT_APP_API_URL: http://localhost:8080/api
